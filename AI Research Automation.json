@@ -1,0 +1,207 @@
+{
+  "name": "AI Research Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "research-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "883ffed3-626e-42ee-887b-0aabd08c0cd1",
+      "name": "Webhook",
+      "webhookId": "ded74ba2-c3bd-4bd5-84ed-b60c75c2d782"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a research planner. Given a topic, break it into 3-4 specific research sub-questions. Return ONLY a JSON array of strings, nothing else.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.body.topic }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "b8adffd9-88a4-4cf2-a725-202fe299f7bf",
+      "name": "Planner",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kUHQMl2GMoapnvnT",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $input.first().json.choices[0].message.content;\nconst questions = JSON.parse(content);\n\nreturn questions.map(q => ({ json: { question: q } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "85fdbb32-f8ad-4274-a971-63b4eb4d73fa",
+      "name": "Parser Questions"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"api_key\": \"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\",\n  \"query\": \"{{ $json.question }}\",\n  \"search_depth\": \"basic\",\n  \"max_results\": 3\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "2b134acf-a6c2-4fe3-a5c0-e7bbac2b5bde",
+      "name": "Tavily Search"
+    },
+    {
+      "parameters": {
+        "jsCode": "let combined = \"\";\n\nfor (const item of $input.all()) {\n  const q = item.json.query;\n  combined += `\\n\\n### Question: ${q}\\n`;\n  \n  const results = item.json.results || [];\n  for (const r of results) {\n    combined += `- ${r.title}: ${r.content}\\n`;\n  }\n}\n\nreturn [{ json: { research_data: combined } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "48aa5e35-3819-4d9f-b5db-c2d2e58916f9",
+      "name": "Combine Research"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model: \"llama-3.3-70b-versatile\", messages: [{role: \"system\", content: \"You are a professional research analyst. Using the provided research data, write a well-structured, polished report with clear sections and headings. Be concise but thorough.\"}, {role: \"user\", content: $json.research_data}]}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "f58dbdba-18b8-4156-bcb9-6ee3bb269da3",
+      "name": "Writer",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kUHQMl2GMoapnvnT",
+          "name": "Header Auth account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "topic": "Analyze top competitors of Tesla"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planner": {
+      "main": [
+        [
+          {
+            "node": "Parser Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser Questions": {
+      "main": [
+        [
+          {
+            "node": "Tavily Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Search": {
+      "main": [
+        [
+          {
+            "node": "Combine Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Research": {
+      "main": [
+        [
+          {
+            "node": "Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d850004a-0770-42c2-a72b-b8cc1e58bf09",
+  "meta": {
+    "instanceId": "5f6d4d3b0d802c6742fd3fdfae8cb518c436790d74d3e4f0fd68f50f9fd689d7"
+  },
+  "nodeGroups": [],
+  "id": "FTBz8xZ5C1jpHiyI",
+  "tags": []
+}
