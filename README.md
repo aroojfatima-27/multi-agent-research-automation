@@ -31,7 +31,8 @@ Most automation projects I see are single-step — trigger goes in, one API call
 2. Drop in your own Groq and Tavily API keys (both have free tiers, no card needed)
 3. Activate it, hit the webhook with a topic:
    { "topic": "your topic here" }
-4. Wait a few seconds, get your report back
+   ![Example Output](output-screenshot.png)
+5. Wait a few seconds, get your report back
 
 ## Known limitations / things I'd improve next
 
